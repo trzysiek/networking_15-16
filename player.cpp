@@ -5,7 +5,6 @@ namespace po = boost::program_options;
 #include <iostream>
 #include <string>
 
-#include <errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
@@ -49,7 +48,7 @@ int karaj() {
     if (sockfd < 0) {
         freeaddrinfo(res);
         std::cerr << "socket error" << endl;
-        return errno; // return error code, from errno.h
+        return 1;
     }
 
 	// connect!
@@ -57,7 +56,7 @@ int karaj() {
     if (s < 0) {
         freeaddrinfo(res);
         std::cerr << "connect error" << endl;
-        return errno; // return error code, from errno.h
+        return 1;
     }
     freeaddrinfo(res);
     
