@@ -23,7 +23,7 @@ using std::endl;
 
 std::string createRequest(std::string path, std::string meta) {
     return "GET " + path + " HTTP/1.0\r\n" +
-           "Icy-MetaData:" + std::to_string(meta) + "\r\n" +
+           "Icy-MetaData:" + meta + "\r\n" +
            "\r\n";
 }
 
