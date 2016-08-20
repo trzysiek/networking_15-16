@@ -1,1 +1,3 @@
-g++ -std=c++11 player.cpp -lboost_program_options -o player
+g++ -std=c++11 -c TCP_server.cpp
+g++ -std=c++11 -c player.cpp
+g++ -std=c++11 player.o TCP_server.o -lboost_program_options -o player

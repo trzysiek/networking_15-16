@@ -1,90 +1,21 @@
+#include "player.h"
+
 #include <boost/program_options.hpp>
 
 namespace po = boost::program_options;
 
 #include <iostream>
-#include <string>
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-
-const unsigned int PARAMETERS_NR = 6;
-const unsigned int BUFFER_SIZE = 2000;
-
-std::string host;
-std::string path;
-int servPort;
-int ourPort;
-std::string outputFile;
-std::string md;
-
-using std::endl;
-
-std::string createRequest(std::string path, std::string meta) {
-    return "GET " + path + " HTTP/1.0\r\n" +
-           "Icy-MetaData:" + meta + "\r\n" +
-           "\r\n";
-}
-
-int karaj() {
-	struct addrinfo hints, *res;
-	int sockfd;
-    int s;
-
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_UNSPEC;      // either ip4 or 6
-	hints.ai_socktype = SOCK_STREAM;  // tcp
-    // TODO: sprawdzic czy warto/trzeba dodac AI_PASSIVE w hints.flags?
-
-    // get address
-	if ((s = getaddrinfo(host.c_str(), std::to_string(servPort).c_str(), &hints, &res)) != 0) {
-		std::cerr << "getaddrinfo error: " << gai_strerror(s) << endl;
-        return 1;
-	}
-
-	// make a socket:
-	sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-    if (sockfd < 0) {
-        freeaddrinfo(res);
-        std::cerr << "socket error" << endl;
-        return 1;
-    }
-
-	// connect!
-	s = connect(sockfd, res->ai_addr, res->ai_addrlen);
-    if (s < 0) {
-        freeaddrinfo(res);
-        std::cerr << "connect error" << endl;
-        return 1;
-    }
-    freeaddrinfo(res);
-    
-    std::string request = createRequest(path, (md == "yes") ? "1" : "0");
-    std::cout << request << endl;
-
-    // send request to server
-    if (send(sockfd, request.c_str(), request.size(), 0) < 0) {
-        std::cerr << "send error" << endl;
-        return 1;
-    }
-
-    char buffer[BUFFER_SIZE];
-    memset(buffer, 0, BUFFER_SIZE);
-
-    // receive the answer
-    s = recv(sockfd, buffer, BUFFER_SIZE - 1, 0);
-
-    // powinno dzialac
-    std::cout << buffer << endl << "GG\n";
-}
 
 int main(int argc, char* argv[]) {
-    using std::cout;
+    std::string host;
+    std::string path;
+    int servPort;
+    int ourPort;
+    std::string outputFile;
+    std::string md;
 
     try {
-		// skopiowac tu globablne zmienne
-
         po::options_description desc("OPTIONS");
         desc.add_options()
             ("host", po::value<std::string>(&host), "host server name")
@@ -109,29 +40,23 @@ int main(int argc, char* argv[]) {
                   options(desc).positional(p).run(), vm);
         po::notify(vm);
     
-
-        if (vm.size() != PARAMETERS_NR) {
-            cout << "Usage: player OPTIONS\n";
-            cout << desc;
+        if (vm.size() != PLAYER_PARAMETERS_NR) {
+            std::cout << "Usage: player OPTIONS\n";
+            std::cout << desc;
             return 1;
         }
         else {
             // TODO: usunac debug
-            cout << host << endl;
-            cout << path << endl;
-            cout << servPort << endl;
-            cout << outputFile << endl;
-            cout << ourPort << endl;
-            cout << md << endl;
+            printf("%s\n%s\n%d\n%s\n%d\n%s\n", host.c_str(), path.c_str(),
+                    servPort, outputFile.c_str(), ourPort, md.c_str());
 
             // dodac jakies sprawdzenia czy md, porty poprawne, itp.
-            // run program
-            karaj();
+            connect_with_server(host, path, servPort, ourPort, md);
         }
     }
     catch(std::exception& e)
     {
-        cout << e.what() << "\n";
+        std::cout << e.what() << std::endl;
         return 1;
     }    
     return 0;
