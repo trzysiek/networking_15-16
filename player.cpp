@@ -5,7 +5,66 @@
 namespace po = boost::program_options;
 
 #include <iostream>
+#include <sys/poll.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 
+#define TCP_S 0
+#define UDP_S 1
+
+const unsigned int SOCKETS_NR = 2;
+struct pollfd fds[SOCKETS_NR];
+int backup_udp_fd;
+int backup_tcp_fd;
+
+int run_main_player(int tcp_fd, int udp_fd) {
+    printf("runuje main playera!!\ntcp_fd: %d, udp_fd: %d\n", tcp_fd, udp_fd);
+
+    int BUF_SIZE = 2000; //todo lepiej
+    char buf[BUF_SIZE];
+
+    fds[TCP_S].fd = tcp_fd;
+    fds[TCP_S].events = POLLIN;
+
+    fds[UDP_S].fd = udp_fd;
+    fds[UDP_S].events = POLLIN;
+
+    for (;;) {
+        fds[0].revents = 0;
+        fds[1].revents = 0;
+
+        if ((poll(fds, 2, -1)) == -1) {
+            std::cerr << "error in poll\n";
+            return 1;
+        }
+        printf("polled?\n");
+        if (fds[0].revents & POLLIN) {
+            printf("0\n");
+            process_tcp_event(tcp_fd);
+        }
+        if (fds[1].revents & POLLIN) {
+            printf("1\n");
+            process_udp_event(udp_fd);
+        }
+    }
+}
+
+void pause_player() {
+    backup_tcp_fd = fds[TCP_S].fd;
+    fds[TCP_S].fd = -1;
+}
+
+void resume_player() {
+    fds[TCP_S].fd = backup_tcp_fd;
+}
+
+void send_title() {
+}
+
+void finito_amigos() {
+    close(backup_tcp_fd);
+    close(backup_udp_fd);
+}
 
 int main(int argc, char* argv[]) {
     std::string host;
@@ -51,7 +110,10 @@ int main(int argc, char* argv[]) {
                     servPort, outputFile.c_str(), ourPort, md.c_str());
 
             // dodac jakies sprawdzenia czy md, porty poprawne, itp.
-            connect_with_server(host, path, servPort, ourPort, md);
+            int tcp_fd = connect_with_server(host, path, servPort, ourPort, md);
+            int udp_fd = setup_udp_server(ourPort); 
+            run_main_player(tcp_fd, udp_fd);
+            finito_amigos();
         }
     }
     catch(std::exception& e)

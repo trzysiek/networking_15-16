@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <unistd.h> // "close"
 
 const unsigned int BUFFER_SIZE = 2000;
 
@@ -29,7 +30,7 @@ int connect_with_server(std::string host, std::string path,
     // get address
 	if ((s = getaddrinfo(host.c_str(), std::to_string(servPort).c_str(), &hints, &res)) != 0) {
 		std::cerr << "getaddrinfo error: " << gai_strerror(s) << std::endl;
-        return 1;
+        return -1;
 	}
 
 	// make a socket:
@@ -37,15 +38,16 @@ int connect_with_server(std::string host, std::string path,
     if (sockfd < 0) {
         freeaddrinfo(res);
         std::cerr << "socket error" << std::endl;
-        return 1;
+        return -1;
     }
 
 	// connect
 	s = connect(sockfd, res->ai_addr, res->ai_addrlen);
     if (s < 0) {
         freeaddrinfo(res);
+        close(sockfd);
         std::cerr << "connect error" << std::endl;
-        return 1;
+        return -1;
     }
     freeaddrinfo(res);
     
@@ -54,8 +56,9 @@ int connect_with_server(std::string host, std::string path,
 
     // send request to server
     if (send(sockfd, request.c_str(), request.size(), 0) < 0) {
+        close(sockfd);
         std::cerr << "send error" << std::endl;
-        return 1;
+        return -1;
     }
 
     char buffer[BUFFER_SIZE];
@@ -66,4 +69,10 @@ int connect_with_server(std::string host, std::string path,
 
     // powinno dzialac
     printf("%s\nGG\n", buffer);
+
+    return sockfd;
+}
+
+int process_tcp_event(int fd) {
+
 }
