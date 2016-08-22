@@ -74,5 +74,8 @@ int connect_with_server(std::string host, std::string path,
 }
 
 int process_tcp_event(int fd) {
-
+    int BUFFER_SIZE = 200000;
+    char buf[BUFFER_SIZE];
+    recv(fd, buf, BUFFER_SIZE, 0);
+    std::cout << buf;
 }

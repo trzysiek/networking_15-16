@@ -18,21 +18,26 @@ int setup_udp_server(int port) {
     hints.ai_socktype = SOCK_STREAM; // TCP
     hints.ai_flags = AI_PASSIVE; // fill my IP for me
 
-    getaddrinfo(NULL, std::to_string(port).c_str(), &hints, &res);
+    for (;;) {
+        getaddrinfo(NULL, std::to_string(port).c_str(), &hints, &res);
 
-    sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-    if (sockfd < 0) {
-        freeaddrinfo(res);
-        std::cerr << "socket error" << std::endl;
-        return -1;
+        sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+        if (sockfd < 0) {
+            freeaddrinfo(res);
+            std::cerr << "socket error" << std::endl;
+            return -1;
+        }
+
+        if ((bind(sockfd, res->ai_addr, res->ai_addrlen)) >= 0)
+            break;
+        else
+            port++;
+            //freeaddrinfo(res);
+            //close(sockfd);
+            //std::cerr << "bind error" << std::endl;
+            //return -1;
     }
-    
-    if ((bind(sockfd, res->ai_addr, res->ai_addrlen)) < 0) {
-        freeaddrinfo(res);
-        close(sockfd);
-        std::cerr << "bind error" << std::endl;
-        return -1;
-    }
+    std::cout << port << std::endl;
 
     return sockfd;
 

@@ -20,6 +20,9 @@ int backup_tcp_fd;
 int run_main_player(int tcp_fd, int udp_fd) {
     printf("runuje main playera!!\ntcp_fd: %d, udp_fd: %d\n", tcp_fd, udp_fd);
 
+    backup_udp_fd = udp_fd;
+    backup_tcp_fd = tcp_fd;
+
     int BUF_SIZE = 2000; //todo lepiej
     char buf[BUF_SIZE];
 
@@ -37,7 +40,6 @@ int run_main_player(int tcp_fd, int udp_fd) {
             std::cerr << "error in poll\n";
             return 1;
         }
-        printf("polled?\n");
         if (fds[0].revents & POLLIN) {
             printf("0\n");
             process_tcp_event(tcp_fd);
@@ -50,7 +52,6 @@ int run_main_player(int tcp_fd, int udp_fd) {
 }
 
 void pause_player() {
-    backup_tcp_fd = fds[TCP_S].fd;
     fds[TCP_S].fd = -1;
 }
 
