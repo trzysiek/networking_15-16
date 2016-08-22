@@ -12,10 +12,15 @@ namespace po = boost::program_options;
 #define TCP_S 0
 #define UDP_S 1
 
+// GLOBAL RESOURCES
 const unsigned int SOCKETS_NR = 2;
 struct pollfd fds[SOCKETS_NR];
 int backup_udp_fd;
 int backup_tcp_fd;
+int md_int = 8192; // metadata interval (default 8192)
+std::string title; // current title of song
+bool fetched_md; // says if we already received metadata and
+                 // e.g. set 2 variables above already
 
 int run_main_player(int tcp_fd, int udp_fd) {
     printf("runuje main playera!!\ntcp_fd: %d, udp_fd: %d\n", tcp_fd, udp_fd);
@@ -32,6 +37,8 @@ int run_main_player(int tcp_fd, int udp_fd) {
     fds[UDP_S].fd = udp_fd;
     fds[UDP_S].events = POLLIN;
 
+    bool is_first_tcp = true;
+
     for (;;) {
         fds[0].revents = 0;
         fds[1].revents = 0;
@@ -41,8 +48,13 @@ int run_main_player(int tcp_fd, int udp_fd) {
             return 1;
         }
         if (fds[0].revents & POLLIN) {
-            printf("0\n");
-            process_tcp_event(tcp_fd);
+            //printf("0 ");
+            if (is_first_tcp) {
+                if (process_first_tcp_event(tcp_fd))
+                    is_first_tcp = false;
+            }
+            else
+                process_normal_tcp_event(tcp_fd);
         }
         if (fds[1].revents & POLLIN) {
             printf("1\n");
