@@ -25,7 +25,7 @@ bool parse_the_metadata(char *buf, int len) {
     if (!fetched_md) {
         // no md_interval known yet
         size_t pos = s.find(METAINT_STR);
-        std::cout << buf << std::endl;
+        //std::cout << buf << std::endl;
         if (pos != std::string::npos) {
             // lets parse the md_int (global)
             md_int = 0;
@@ -39,15 +39,15 @@ bool parse_the_metadata(char *buf, int len) {
     }
     size_t pos = s.find(TITLE_STR);
     if (pos != std::string::npos) {
-        std::cout << "JEST!\n";
-        std::cout << buf << std::endl;
+        //std::cout << "JEST!\n";
+        //std::cout << buf << std::endl;
         pos += TITLE_STR.size();
         title = "";
         while (buf[pos] != ';') {
             title += buf[pos];
             pos++;
         }
-        std::cout << "TITLE: " << title << std::endl;
+        //std::cout << "TITLE: " << title << std::endl;
         return true;
     }
     return false;
