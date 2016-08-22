@@ -1,1 +1,2 @@
-./player ant-waw-01.cdn.eurozet.pl / 8602 - 123 yes | mplayer -cache 2048 -
+./player stream3.polskieradio.pl / 8900 - 123 yes | mplayer -cache 1024 -
+

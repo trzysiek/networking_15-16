@@ -1,0 +1,4 @@
+./MAKE kompiluje wszystko. Potrzebny jest boost (u mnie wystarczylo sudo apt install libboost1.58-all-dev).
+./RUN to proste odpalenie programu, ktorego uzywalem do testowania playera przez pierwsze 95% czasu developmentu.
+./S to odpalenie 1. przykladu z tresci, z dodanymi opcjami tak by dzialalo
+./ANTY odpala stream antyradia :P
