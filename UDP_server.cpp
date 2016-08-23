@@ -18,6 +18,7 @@ int setup_udp_server(int port) {
     hints.ai_socktype = SOCK_STREAM; // TCP
     hints.ai_flags = AI_PASSIVE; // fill my IP for me
 
+    // find first free port number >= "port"
     for (;;) {
         getaddrinfo(NULL, std::to_string(port).c_str(), &hints, &res);
 
@@ -32,16 +33,8 @@ int setup_udp_server(int port) {
             break;
         else
             port++;
-            //freeaddrinfo(res);
-            //close(sockfd);
-            //std::cerr << "bind error" << std::endl;
-            //return -1;
     }
-    std::cout << port << std::endl;
-
     return sockfd;
-
-    // dodac faile!!
 }
 
 void process_udp_message(char *buf) {
@@ -55,12 +48,15 @@ void process_udp_message(char *buf) {
         printf("quit\n");
         finito_amigos();
     }
+    else {
+        
+    }
 }
 
 int process_udp_event(int fd) {
     struct sockaddr_in client_address;
 
-    char buf[2000];
+    char buf[MAX_BUF_SIZE];
     int flags = 0; // nothing special
     socklen_t rcva_len = (socklen_t) sizeof(client_address);
     int len = recvfrom(fd, buf, sizeof buf, flags,

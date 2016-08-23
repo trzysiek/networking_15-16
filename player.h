@@ -4,6 +4,7 @@
 #include <string>
 
 const unsigned int PLAYER_PARAMETERS_NR = 6;
+const unsigned int MAX_BUF_SIZE = 32768;
 
 std::string create_request(std::string path, std::string meta);
 int connect_with_server(std::string host, std::string path,
@@ -22,7 +23,7 @@ const std::string METAINT_STR = "icy-metaint:";
 const std::string TITLE_STR = "StreamTitle=";
 
 extern int md_int;
-extern bool fetched_md;
-extern std::string title;
+extern bool is_md_fetched;
+extern std::string last_received_title;
 
 #endif

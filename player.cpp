@@ -17,19 +17,19 @@ const unsigned int SOCKETS_NR = 2;
 struct pollfd fds[SOCKETS_NR];
 int backup_udp_fd;
 int backup_tcp_fd;
-int md_int = 8192; // metadata interval (default 8192)
-std::string title; // current title of song
-bool fetched_md; // says if we already received metadata and
-                 // e.g. set 2 variables above already
+int md_int = 8192;  // metadata interval (default 8192)
+std::string last_received_title;  // current title of song
+bool is_md_fetched; // says if we already received metadata and set it to
+                    // correct value instead of default
 
 int run_main_player(int tcp_fd, int udp_fd) {
-    printf("runuje main playera!!\ntcp_fd: %d, udp_fd: %d\n", tcp_fd, udp_fd);
+    std::cerr << "main player is being run. tcp_fd: " << tcp_fd
+              << " udp_fd: " << udp_fd << std::endl;
 
     backup_udp_fd = udp_fd;
     backup_tcp_fd = tcp_fd;
 
-    int BUF_SIZE = 2000; //todo lepiej
-    char buf[BUF_SIZE];
+    char buf[MAX_BUF_SIZE];
 
     fds[TCP_S].fd = tcp_fd;
     fds[TCP_S].events = POLLIN;
@@ -48,16 +48,12 @@ int run_main_player(int tcp_fd, int udp_fd) {
             return 1;
         }
         if (fds[0].revents & POLLIN) {
+            //fix
             //printf("0 ");
-            if (is_first_tcp) {
-                if (process_first_tcp_event(tcp_fd))
-                    is_first_tcp = false;
-            }
-            else
-                process_normal_tcp_event(tcp_fd);
+                if (process_first_tcp_event(tcp_fd)) {}
         }
         if (fds[1].revents & POLLIN) {
-            printf("1\n");
+            std::cerr << "1\n";
             process_udp_event(udp_fd);
         }
     }
@@ -118,9 +114,13 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         else {
-            // TODO: usunac debug
-            printf("%s\n%s\n%d\n%s\n%d\n%s\n", host.c_str(), path.c_str(),
-                    servPort, outputFile.c_str(), ourPort, md.c_str());
+            std::cerr << "parameters for player:" << std::endl
+                      << host << std::endl
+                      << path << std::endl
+                      << servPort << std::endl
+                      << outputFile << std::endl
+                      << ourPort << std::endl
+                      << md << std::endl;
 
             // dodac jakies sprawdzenia czy md, porty poprawne, itp.
             int tcp_fd = connect_with_server(host, path, servPort, ourPort, md);
@@ -131,7 +131,7 @@ int main(int argc, char* argv[]) {
     }
     catch(std::exception& e)
     {
-        std::cout << e.what() << std::endl;
+        std::cerr << e.what() << std::endl;
         return 1;
     }    
     return 0;
