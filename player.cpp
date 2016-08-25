@@ -26,6 +26,7 @@ int run_main_player(int tcp_fd, int udp_fd) {
     std::cerr << "main player is being run. tcp_fd: " << tcp_fd
               << " udp_fd: " << udp_fd << std::endl;
 
+    // set global variables
     backup_udp_fd = udp_fd;
     backup_tcp_fd = tcp_fd;
 
@@ -35,13 +36,14 @@ int run_main_player(int tcp_fd, int udp_fd) {
     fds[TCP_S].events = POLLIN;
 
     fds[UDP_S].fd = udp_fd;
-    fds[UDP_S].events = POLLIN | POLLOUT | POLLPRI;
+    fds[UDP_S].events = POLLIN | POLLOUT;
 
     bool is_first_tcp = true;
 
     for (;;) {
         fds[TCP_S].revents = 0;
         fds[UDP_S].revents = 0;
+
         fds[TCP_S].fd = -1;
 
         if ((poll(fds, 2, -1)) == -1) {
@@ -53,7 +55,7 @@ int run_main_player(int tcp_fd, int udp_fd) {
             printf("0 ");
                 if (process_first_tcp_event(tcp_fd)) {}
         }
-        if (fds[UDP_S].revents & (POLLIN | POLLPRI)) {
+        if (fds[UDP_S].revents & POLLIN) {
             std::cerr << "GG WP 1\n";
             process_udp_event(udp_fd);
         }
