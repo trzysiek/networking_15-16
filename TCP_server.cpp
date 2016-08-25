@@ -17,7 +17,7 @@ std::string create_request(std::string path, std::string meta) {
            "\r\n";
 }
 
-// true if ok, false otherwise
+// true if ok (there was metadata, and its parsed), false otherwise
 bool parse_the_metadata(char *buf, int len) {
     std::string s (buf, len);
     if (!is_md_fetched) {
@@ -53,7 +53,7 @@ bool parse_the_metadata(char *buf, int len) {
 }
 
 int connect_with_server(std::string host, std::string path,
-        int servPort, int ourPort, std::string md) {
+                        int servPort, std::string md) {
 	struct addrinfo hints, *res;
 	int sockfd;
     int s;
@@ -117,7 +117,7 @@ bool process_first_tcp_event(int fd) {
     static int pom = 0;
     bool is_titled = parse_the_metadata(buf, len);
     pom += len;
-    std::cerr << "len: " << len << "       lenmod: " << len % md_int << " is_tilted " << is_titled << std::endl;
+    //std::cerr << "len: " << len << "       lenmod: " << len % md_int << " is_tilted " << is_titled << std::endl;
     //std::cout.write(buf, len); std::cout << "\n\n";}
 
     return is_titled;

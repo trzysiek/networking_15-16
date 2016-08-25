@@ -9,8 +9,10 @@
 #include <cstring>
 #include <string>
 
+// todo fix jak nie bedzie zadnego portu wolnego
 int setup_udp_server(int port) {
-    struct addrinfo hints, *res;
+    struct addrinfo hints;
+    struct addrinfo *res;
     int sockfd;
 
     memset(&hints, 0, sizeof hints);
@@ -20,7 +22,11 @@ int setup_udp_server(int port) {
 
     // find first free port number >= "port"
     for (;;) {
-        getaddrinfo(NULL, std::to_string(port).c_str(), &hints, &res);
+        std::cerr << "port: " << port << std::endl;
+        if ((getaddrinfo(NULL, std::to_string(port).c_str(), &hints, &res)) != 0) {
+            std::cerr << "getaddrinfo in setup_udp_server failed\n";
+            return -1;
+        }
 
         sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
         if (sockfd < 0) {
@@ -34,10 +40,12 @@ int setup_udp_server(int port) {
         else
             port++;
     }
+    std::cerr << "UDP port: " << port << std::endl;
     return sockfd;
 }
 
 void process_udp_message(char *buf) {
+    std::cerr << "udp buf\n" << buf << std::endl;
     if (buf == "PAUSE\0")
         pause_player();
     else if (buf == "PLAY\0")
@@ -45,12 +53,11 @@ void process_udp_message(char *buf) {
     else if (buf == "TITLE\0")
         send_title();
     else if (buf == "QUIT\0") {
-        printf("quit\n");
+        std::cerr << "Received QUIT message\n";
         finito_amigos();
     }
-    else {
-        
-    }
+    else
+        std::cerr << "Invalid message type\n";
 }
 
 int process_udp_event(int fd) {

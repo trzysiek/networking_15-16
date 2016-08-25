@@ -8,7 +8,7 @@ const unsigned int MAX_BUF_SIZE = 32768;
 
 std::string create_request(std::string path, std::string meta);
 int connect_with_server(std::string host, std::string path,
-                         int servPort, int ourPort, std::string md);
+                        int servPort, std::string md);
 int setup_udp_server(int port);
 int process_udp_event(int udp_fd);
 bool process_first_tcp_event(int tcp_fd);

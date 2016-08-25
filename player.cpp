@@ -35,25 +35,26 @@ int run_main_player(int tcp_fd, int udp_fd) {
     fds[TCP_S].events = POLLIN;
 
     fds[UDP_S].fd = udp_fd;
-    fds[UDP_S].events = POLLIN;
+    fds[UDP_S].events = POLLIN | POLLOUT | POLLPRI;
 
     bool is_first_tcp = true;
 
     for (;;) {
-        fds[0].revents = 0;
-        fds[1].revents = 0;
+        fds[TCP_S].revents = 0;
+        fds[UDP_S].revents = 0;
+        fds[TCP_S].fd = -1;
 
         if ((poll(fds, 2, -1)) == -1) {
             std::cerr << "error in poll\n";
             return 1;
         }
-        if (fds[0].revents & POLLIN) {
+        if (fds[TCP_S].revents & POLLIN) {
             //fix
-            //printf("0 ");
+            printf("0 ");
                 if (process_first_tcp_event(tcp_fd)) {}
         }
-        if (fds[1].revents & POLLIN) {
-            std::cerr << "1\n";
+        if (fds[UDP_S].revents & (POLLIN | POLLPRI)) {
+            std::cerr << "GG WP 1\n";
             process_udp_event(udp_fd);
         }
     }
@@ -123,7 +124,7 @@ int main(int argc, char* argv[]) {
                       << md << std::endl;
 
             // dodac jakies sprawdzenia czy md, porty poprawne, itp.
-            int tcp_fd = connect_with_server(host, path, servPort, ourPort, md);
+            int tcp_fd = connect_with_server(host, path, servPort, md);
             int udp_fd = setup_udp_server(ourPort); 
             run_main_player(tcp_fd, udp_fd);
             finito_amigos();
