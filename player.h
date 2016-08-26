@@ -36,7 +36,8 @@ const std::string TITLE_STR = "StreamTitle=";
 
 extern int md_int;
 extern std::string last_received_title;
-extern bool is_md_fetched;
+extern bool is_md_in_data;
+extern bool is_md_int_fetched;
 extern bool is_player_paused;
 extern bool is_output_to_file;
 extern std::ofstream output_to_file_stream;

@@ -19,7 +19,8 @@ int backup_udp_fd;
 int backup_tcp_fd;
 int md_int = 8192;  // metadata interval (default 8192)
 std::string last_received_title;  // current title of song
-bool is_md_fetched; // says if we already received metadata and set it to
+bool is_md_in_data;
+bool is_md_int_fetched; // says if we already received metadata and set it to
                     // correct value instead of default
 bool is_player_closed;
 bool is_player_paused;
