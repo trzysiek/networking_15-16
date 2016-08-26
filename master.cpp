@@ -11,7 +11,7 @@
 #include <stack>
 #include <set>
 #include <iostream>
-#include <regex>
+#include <boost/regex.hpp>
 
 using namespace std;
 
@@ -19,50 +19,72 @@ const int MAX_CONNECTIONS = 1000;
 const int BUFF_SIZE = 100;
 
 struct pollfd connections[MAX_CONNECTIONS];
-char player_replies[MAX_CONNECTIONS][BUFF_SIZE];
 stack<int> available_id;
 set<int> player_id;
+map<int, vector<string>> player_replies;
+
+
+void start_command(string command, string hostname, string port, int index) {
+	string message;
+	int id;
+	//TODO: POPEN()? OGARNĄĆ STREAMA Z POPEN ŻEBY ZOBACZYĆ CZY PLAYER SIE NIE WYPIERDALA
+	popen(command.c_str(), "r");
+	//Zarezerwuj id dla nowego playera
+	id = available_id.top();
+	available_id.pop();
+	player_id.insert(id);
+	//Stwórz UDP socketa dla nowego playera
+	struct addrinfo addr_hints;
+  	struct addrinfo *addr_result;
+  	memset(&addr_hints, 0, sizeof addr_hints);
+	addr_hints.ai_family = AF_UNSPEC;
+	addr_hints.ai_socktype = SOCK_DGRAM;
+	addr_hints.ai_flags = AI_PASSIVE;
+	getaddrinfo(hostname.c_str(), port.c_str(), &addr_hints, &addr_result);
+	int sockfd = socket(addr_result->ai_family, addr_result->ai_socktype, addr_result->ai_protocol);
+	if (sockfd < 0) {
+		cerr << "Socker error" << endl;
+	}
+	connect(sockfd, addr_result->ai_addr, addr_result->ai_protocol);
+	connections[id].fd = sockfd;
+	//Powiadom sesję telnetową o sukcesie TODO:BYĆ MOŻE TO POWINNO BYĆ WYSYŁANE PRZY UDANYM POLLOUCIE? ALBO PRZY JAKIMŚ TAM RETURNIE Z POPEN()
+	message = "OK " + to_string(id);
+	send(connections[index].fd, message.c_str(), message.length(), 0);
+}
 
 void process_telnet_input(char buff[], int index) {
-	regex start{"^START (?:([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])(?:\\.(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9]))*|(?:\\d{1,3}(?:\\.\\d{1,3}){3})) ((?:(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])(?:\\.(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9]))*|(?:\\d{1,3}(?:\\.\\d{1,3}){3})) (?:\\w*\\/)+ [1-9]\\d* (?:[\\w,\\s-]+\\.[A-Za-z3]{3}) ([1-9]\\d*) (?:no|yes))(?:\\r\\n|\\r|\\n)$"};
-	regex player_command{"^(PAUSE|PLAY|TITLE|QUIT) ([1-9]\\d*)(\\r\\n|\\r|\\n)$"};
-	regex at{"^AT ((?:[0-9]|0[0-9]|1[0-9]|2[0-3])\\.[0-5][0-9]) ([1-9]\\d*) (?:([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])(?:\\.(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9]))*|(?:\\d{1,3}(?:\\.\\d{1,3}){3})) ((?:(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])(?:\\.(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9]))*|(?:\\d{1,3}(?:\\.\\d{1,3}){3})) (?:\\w*\\/)+ [1-9]\\d* (?:[\\w,\\s-]+\\.[A-Za-z3]{3}) ([1-9]\\d*) (?:no|yes))(?:\\r\\n|\\r|\\n)$"};
-	smatch match;
+	boost::regex start{"^START (?:([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])(?:\\.(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9]))*|(?:\\d{1,3}(?:\\.\\d{1,3}){3})) ((?:(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])(?:\\.(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9]))*|(?:\\d{1,3}(?:\\.\\d{1,3}){3})) (?:\\w*\\/)+ [1-9]\\d* (?:[\\w,\\s-]+\\.[A-Za-z3]{3}) ([1-9]\\d*) (?:no|yes))(?:\\r\\n|\\r|\\n)$"};
+	boost::regex player_command{"^(PAUSE|PLAY|TITLE|QUIT) ([1-9]\\d*)(\\r\\n|\\r|\\n)$"};
+	boost::regex at{"^AT ((?:[0-9]|0[0-9]|1[0-9]|2[0-3])\\.[0-5][0-9]) ([1-9]\\d*) (?:([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])(?:\\.(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9]))*|(?:\\d{1,3}(?:\\.\\d{1,3}){3})) ((?:(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])(?:\\.(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9]))*|(?:\\d{1,3}(?:\\.\\d{1,3}){3})) (?:\\w*\\/)+ [1-9]\\d* (?:[\\w,\\s-]+\\.[A-Za-z3]{3}) ([1-9]\\d*) (?:no|yes))(?:\\r\\n|\\r|\\n)$"};
+	boost::regex control_bytes{"\\xFF[\\xFB-\\xFF].|\\xFF[^\\xFB-\\xFF]"};
+	boost::regex double_escape{"\\xFF\\xFF"};
+	string single_escape("\xFF");
+	boost::smatch match;
+	string empty = "";
 	string input(buff);
 	int id;
+	string message;
 
-	if (regex_search(input, match, start)) {
+	//Usuń kontrolne bajty przysłane przez sesję telnetową TODO:Spróbować to przetestować jakoś
+	boost::regex_replace(input, control_bytes, empty);
+	boost::regex_replace(input, double_escape, single_escape);
+
+	if (boost::regex_search(input, match, start)) {
 		//Otwórz program player na odpowiednim hoście przez ssh
-		string cmd = "ssh " + string(match[1].first, match[1].second) + " ./player " + string(match[2].first , match[2].second);
-		system(cmd.c_str());
-		//Zarezerwuj id dla nowego playera
-		id = available_id.top();
-		available_id.pop();
-		player_id.insert(id);
-		//Stwórz UDP socketa dla nowego playera
-		struct addrinfo addr_hints;
-  		struct addrinfo *addr_result;
-  		memset(&addr_hints, 0, sizeof addr_hints);
-		addr_hints.ai_family = AF_UNSPEC;
-		addr_hints.ai_socktype = SOCK_DGRAM;
-		addr_hints.ai_flags = AI_PASSIVE;
-		getaddrinfo(string(match[1].first, match[1].second).c_str(), string(match[3].first, match[3].second).c_str(), &addr_hints, &addr_result);
-		int sockfd = socket(addr_result->ai_family, addr_result->ai_socktype, addr_result->ai_protocol);
-		if (sockfd < 0) {
-			cerr << "Socker error" << endl;
-		}
-		connect(sockfd, addr_result->ai_addr, addr_result->ai_protocol);
-		connections[id].fd = sockfd;
-
+		string hostname = string(match[1].first, match[1].second); //DA SIE CHBYA PO PROSTU HOSTNAME(PARAMETRY)?
+		string port = string(match[3].first, match[3].second);
+		string cmd = "ssh " + hostname + " player " + string(match[2].first , match[2].second);
+		//Wykonaj działania związane z poleceniem start
+		start_command(cmd, hostname, port, index);
 		//TODO:Wpisać player_replies i dać POLLOUT na sesje telnetowa o indeksie index????
 		
-	} else if (regex_search(input, match, player_command)) {
+	} else if (boost::regex_search(input, match, player_command)) {
 		id = atoi(string(match[2].first, match[2].second).c_str());
-		string message = string(match[1].first, match[1].second);
+		message = string(match[1].first, match[1].second);
 		send(connections[id].fd, &message, message.length(), 0);
 		//TODO:1.Wpisać player_replies i dać POLLOUT JEŚLI TO NIE TITLE 2.Jeśli title to jak otrzymamy tytuł damy POLLOUT itd.
 
-	} else if (regex_search(input, match, at)) {
+	} else if (boost::regex_search(input, match, at)) {
 
 	} else {
 		cerr << "Wrong command received from telnet session" << endl;
@@ -82,12 +104,12 @@ in_port_t get_in_port(struct sockaddr *sa)
 /*
 
 TODO: 	1. FREEADDRINFO, CLOSE SOCKETY
-	2. SPRAWDZENIE PARAMETRÓW PROGRAMU LEPSZE
 	3. WYPISYWAC ERRORA JAK SSH PRÓBUJE PYTAĆ O HASŁO
 	4. ERRORY W FUNKCJACH INNYCH NIZ MAIN TEZ POWINNY WYWALAC PROGRAM
 	5. ERRORY WYPISYWAĆ TELNETOWI
 	6. REGEX_REPLACE żeby wyjebać bajty kontrolne z telneta
 	7. IGNOROWANIE KOMUNIKATÓW DLA AT PLAYERÓW
+	8. MOŻE SPRAWDZAĆ CZY PODANE PORTY SĄ WOLNE W SUMIE?? I W PLAYERZE I MASTERZE.
 
 */
 
@@ -95,7 +117,7 @@ int main(int argc, char *argv[]) {
 	char *port;
 	struct addrinfo addr_hints, *addr_result;
 	char buffer[MAX_CONNECTIONS][BUFF_SIZE];
-	int ret, msgsock, i, j, free_id, rval;
+	int ret, msgsock, i, free_id, rval;
 
 	//Inicjalizacja stosu z wolnymi id
 	for (i = MAX_CONNECTIONS; i > 0; i--) {
@@ -111,18 +133,14 @@ int main(int argc, char *argv[]) {
 
 	//Inicjalizacja tablicy buforów
 	for (i = 0; i < MAX_CONNECTIONS; i++) {
-		for (j = 0; j < BUFF_SIZE; j++) {
-			buffer[i][j] = 0;
-			player_replies[i][j] = 0;
-		}
+		memset(buffer[i], 0, BUFF_SIZE);
 	}
 
 	//Weryfikacja parametrów programu
-	//TODO: Na razie weryfikuje tylko ilość
 	if (argc == 2) {
 		port = argv[1];
-		regex valid_port{"^[1-9]\\d*$"};
-		if (!regex_match(port, valid_port)) {
+		boost::regex valid_port{"^[1-9]\\d*$"};
+		if (!boost::regex_match(port, valid_port)) {
 			cerr << "Invalid port number" << endl;
 			return 1;
 		}
@@ -199,6 +217,7 @@ int main(int argc, char *argv[]) {
 
 			//Szukamy indeksu innego niż 0 na którym zaszło jakieś zdarzenie
 			for (i = 1; i < MAX_CONNECTIONS; i++) {
+				//Znaleziono dane do odczytu
 				if (connections[i].fd != -1 && (connections[i].revents & (POLLIN | POLLERR))) {
 					rval = read(connections[i].fd, buffer[i], BUFF_SIZE);
 					if (rval < 0) {
@@ -213,6 +232,10 @@ int main(int argc, char *argv[]) {
 						process_telnet_input(buffer[i], i);
 						memset(buffer[i], 0, BUFF_SIZE);
 					}
+				}
+				//Znaleziono połączeniu gotowe do zapisu
+				if (connections[i].fd != -1 && (connections[i].revents & POLLOUT)) {
+
 				}
 			}
 
