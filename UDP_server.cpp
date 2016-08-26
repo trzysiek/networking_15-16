@@ -55,18 +55,16 @@ int setup_udp_server(int port) {
     return sockfd;
 }
 
-void process_udp_message(char *buf) {
-    std::cerr << "udp buf\n" << buf << std::endl;
-    if (buf == "PAUSE\0")
+void process_udp_message(char *buf, int len, int fd, struct sockaddr *client_address) {
+    std::cerr << "dostalem: " << buf << std::endl;
+    if (strncmp(buf, "PAUSE", 5) == 0 && len == 5)
         pause_player();
-    else if (buf == "PLAY\0")
+    else if (strncmp(buf, "PLAY", 4) == 0 && len == 4)
         resume_player();
-    else if (buf == "TITLE\0")
-        send_title();
-    else if (buf == "QUIT\0") {
-        std::cerr << "Received QUIT message\n";
+    else if (strncmp(buf, "TITLE", 5) == 0 && len == 5)
+        send_title(fd, *client_address);
+    else if (strncmp(buf, "QUIT", 4) == 0 && len == 4)
         finito_amigos();
-    }
     else
         std::cerr << "Invalid message type\n";
 }
@@ -84,5 +82,5 @@ int process_udp_event(int fd) {
         std::cerr << "recvfrom error, error code: " << errno << std::endl;
         return 1;
     }
-    process_udp_message(buf);
+    process_udp_message(buf, len, fd, (struct sockaddr *) &client_address);
 }

@@ -103,7 +103,7 @@ int connect_with_server(std::string host, std::string path,
     return sockfd;
 }
 
-bool process_first_tcp_event(int fd) {
+bool process_first_tcp_event(int fd, bool is_player_paused) {
     char buf[MAX_BUF_SIZE];
     memset(buf, 0, MAX_BUF_SIZE);
 
@@ -115,12 +115,14 @@ bool process_first_tcp_event(int fd) {
     int len = recv(fd, buf, MAX_BUF_SIZE, 0);
 
     static int pom = 0;
-    bool is_titled = parse_the_metadata(buf, len);
-    pom += len;
-    //std::cerr << "len: " << len << "       lenmod: " << len % md_int << " is_tilted " << is_titled << std::endl;
-    // std::cout.write(buf, len);
-
-    return is_titled;
+    if (!is_player_paused) {
+        bool is_titled = parse_the_metadata(buf, len);
+        pom += len;
+        //std::cerr << "len: " << len << "       lenmod: " << len % md_int << " is_tilted " << is_titled << std::endl;
+        // std::cout.write(buf, len);
+        return is_titled;
+    }
+    return false;
 }
 
 void process_normal_tcp_event(int fd) {
