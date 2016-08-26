@@ -9,7 +9,9 @@
 #include <cstring>
 #include <string>
 
-// todo fix jak nie bedzie zadnego portu wolnego
+// Sets up a udp server working on port 'port'
+// or first free port if 'port' is not free.
+// Returns file descriptor with newly opened socket, or -1 if failed
 int setup_udp_server(int port) {
     struct addrinfo hints;
     struct addrinfo *res;
@@ -21,27 +23,31 @@ int setup_udp_server(int port) {
     hints.ai_flags = AI_PASSIVE; // fill my IP for me
 
     if ((getaddrinfo(NULL, std::to_string(port).c_str(), &hints, &res)) != 0) {
-        std::cerr << "getaddrinfo in setup_udp_server failed\n";
+        std::cerr << "Getaddrinfo in setup_udp_server failed" << std::endl;
         return -1;
     }
 
     sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
     if (sockfd < 0) {
         freeaddrinfo(res);
-        std::cerr << "socket error" << std::endl;
+        std::cerr << "Error in acquiring a socket for udp." << std::endl;
         return -1;
     }
 
-    // find first free port number >= "port"
-    // poprawic :D max_buf_size'a
-    for (int s = -1; s < 0, port <= MAX_BUF_SIZE; port++)
+    // find first free port number >= 'port'
+    for (int s = -1; s < 0 && port <= MAX_PORT; port++)
         s = bind(sockfd, res->ai_addr, res->ai_addrlen);
-    // sprawdzac czy nie wyjechalem poza max_buf_size
-    std::cerr << "Found and bound UDP port: " << port << std::endl;
 
+    if (port > MAX_PORT) {
+        std::cerr << "No port is free to be bound." << std::endl;
+        return -1;
+    }
+
+    std::cerr << "Found and bound UDP port: " << port << std::endl;
     return sockfd;
 }
 
+// Parses and processes further a received UDP message
 void process_udp_message(char *buf, int len, int fd, struct sockaddr *client_address) {
     std::cerr << "Received by UDP: " << buf << std::endl;
     if (strncmp(buf, "PAUSE", 5) == 0 && len == 5)
@@ -56,7 +62,7 @@ void process_udp_message(char *buf, int len, int fd, struct sockaddr *client_add
         std::cerr << "Invalid message type\n";
 }
 
-int process_udp_event(int fd) {
+void process_udp_event(int fd) {
     struct sockaddr_in client_address;
 
     char buf[MAX_BUF_SIZE];
@@ -65,9 +71,8 @@ int process_udp_event(int fd) {
     socklen_t rcva_len = (socklen_t) sizeof(client_address);
     int len = recvfrom(fd, buf, sizeof buf, flags,
             (struct sockaddr *) &client_address, &rcva_len);
-    if (len < 0) {
-        std::cerr << "recvfrom error, error code: " << errno << std::endl;
-        return 1;
-    }
-    process_udp_message(buf, len, fd, (struct sockaddr *) &client_address);
+    if (len < 0)
+        std::cerr << "Recvfrom error, error code: " << errno << std::endl;
+    else
+        process_udp_message(buf, len, fd, (struct sockaddr *) &client_address);
 }

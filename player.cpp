@@ -31,7 +31,7 @@ int run_main_player(int tcp_fd, int udp_fd) {
 
     char buf[MAX_BUF_SIZE];
 
-    // set global variables
+    // setting global variables
     backup_udp_fd = udp_fd;
     backup_tcp_fd = tcp_fd;
 
@@ -48,7 +48,7 @@ int run_main_player(int tcp_fd, int udp_fd) {
         fds[UDP_S].revents = 0;
 
         if ((poll(fds, 2, -1)) == -1) {
-            std::cerr << "error in poll\n";
+            std::cerr << "Error in poll." << std::endl;
             return 1;
         }
         if (fds[TCP_S].revents & POLLIN) {
@@ -89,7 +89,6 @@ void finito_amigos() {
     std::cerr << "Player closed." << std::endl;
 }
 
-// dodac jakies sprawdzenia czy md, porty poprawne, itp.
 Parameters parse_parameters(int argc, char* argv[]) {
     Parameters p;
 
@@ -107,7 +106,7 @@ Parameters parse_parameters(int argc, char* argv[]) {
     po::positional_options_description pod;
     pod.add("host", 1);
     pod.add("path", 1);
-    pod.add("r-port", 1);
+    pod.add("r-port", 1); // TODO regexem sprawdzac czy ok port?
     pod.add("file", 1);
     pod.add("m-port", 1);
     pod.add("md", 1);
@@ -118,39 +117,45 @@ Parameters parse_parameters(int argc, char* argv[]) {
     po::notify(vm);
 
     if (vm.size() != PLAYER_PARAMETERS_NR) {
-        std::cout << "Usage: player OPTIONS\n";
-        std::cout << desc;
+        std::cerr << "Usage: player OPTIONS\n";
+        std::cerr << desc;
         throw new std::runtime_error("Unmatched number of player parameters."); 
     }
+
+    if (p.md != "yes" && p.md != "no")
+        throw new std::runtime_error("Metadata must be either 'yes' or 'no' (without '').\n");
 
     return p;
 }
 
 int main(int argc, char* argv[]) {
+    Parameters p;
     try {
-        Parameters p = parse_parameters(argc, argv);
-        std::cerr << "Parameters for player:" << std::endl
-                  << "host: " << p.host << std::endl
-                  << "path: " << p.path << std::endl
-                  << "serv port: " << p.serv_port << std::endl
-                  << "output file: " << p.output_file << std::endl
-                  << "our UDP port: " << p.our_udp_port << std::endl
-                  << "metadata? " << p.md << std::endl << std::endl;
-
-        if (p.output_file != "-") {
-            is_output_to_file = true;
-            output_to_file_stream.open(p.output_file, std::ofstream::binary);
-        }
-        else
-            is_output_to_file = false;
-
-        int tcp_fd = connect_with_server(p.host, p.path, p.serv_port, p.md);
-        int udp_fd = setup_udp_server(p.our_udp_port); 
-        run_main_player(tcp_fd, udp_fd);
+        p = parse_parameters(argc, argv);
     }
     catch (std::exception& e) {
         std::cerr << e.what() << std::endl;
         return 1;
     }    
+
+    std::cerr << "Parameters for player:" << std::endl
+              << "host: " << p.host << std::endl
+              << "path: " << p.path << std::endl
+              << "serv port: " << p.serv_port << std::endl
+              << "output file: " << p.output_file << std::endl
+              << "our UDP port: " << p.our_udp_port << std::endl
+              << "metadata? " << p.md << std::endl << std::endl;
+
+    if (p.output_file != "-") {
+        is_output_to_file = true;
+        output_to_file_stream.open(p.output_file, std::ofstream::binary);
+    }
+    else
+        is_output_to_file = false;
+
+    int tcp_fd = connect_with_server(p.host, p.path, p.serv_port, p.md);
+    int udp_fd = setup_udp_server(p.our_udp_port); 
+    run_main_player(tcp_fd, udp_fd);
+
     return 0;
 }

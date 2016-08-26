@@ -7,6 +7,7 @@
 const unsigned int PLAYER_SOCKETS_NR = 2;
 const unsigned int PLAYER_PARAMETERS_NR = 6;
 const unsigned int MAX_BUF_SIZE = 32768;
+const unsigned int MAX_PORT = 65335;
 
 struct Parameters {
     std::string host;
@@ -21,7 +22,7 @@ std::string create_request(std::string path, std::string meta);
 int connect_with_server(std::string host, std::string path,
                         int servPort, std::string md);
 int setup_udp_server(int port);
-int process_udp_event(int udp_fd);
+void process_udp_event(int udp_fd);
 bool process_first_tcp_event(int tcp_fd, bool is_player_paused);
 void process_normal_tcp_event(int tcp_fd);
 
