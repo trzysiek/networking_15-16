@@ -1,5 +1,6 @@
-- obsluga UDP
-- test czy UDP dziala nice (pythonowy program do slania msg po udp?)
+#- obsluga UDP
+#- test czy UDP dziala nice (pythonowy program do slania msg po udp?)
 - ogarniecie protokolu TCP (cos nie dziala)
-- poprawa pauzy/resume (nie mozna wylaczac deskryptora chyba tylko odbierac i olewac)
-- UDP obsluga zlego msg i test tego
+#- poprawa pauzy/resume (nie mozna wylaczac deskryptora chyba tylko odbierac i olewac)
+#- UDP obsluga zlego msg i test tego
+- plik
