@@ -15,12 +15,12 @@ struct Parameters {
     int serv_port;
     int our_udp_port;
     std::string output_file;
-    std::string md;
+    bool md;
 };
 
 std::string create_request(std::string path, std::string meta);
-int connect_with_server(std::string host, std::string path,
-                        int servPort, std::string md);
+int setup_tcp_client(std::string host, std::string path,
+                     int servPort, bool md);
 int setup_udp_server(int port);
 void process_udp_event(int udp_fd);
 bool process_first_tcp_event(int tcp_fd, bool is_player_paused);

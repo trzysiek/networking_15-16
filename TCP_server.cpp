@@ -10,11 +10,14 @@
 #include <netdb.h>
 #include <unistd.h> // "close"
 
-/* create initial request in ICY protocol */
-std::string create_request(std::string path, std::string meta) {
+// create initial request in ICY protocol
+std::string create_request(std::string path, bool md) {
     return "GET " + path + " HTTP/1.0\r\n" +
-           "Icy-MetaData:" + meta + "\r\n" +
+           "Icy-MetaData:" + (md ? '1' : '0') + "\r\n" +
            "\r\n";
+}
+
+bool parse_the_metaint(char *buf, int len) {
 }
 
 // true if ok (there was metadata, and its parsed), false otherwise
@@ -52,8 +55,8 @@ bool parse_the_metadata(char *buf, int len) {
     return false;
 }
 
-int connect_with_server(std::string host, std::string path,
-                        int servPort, std::string md) {
+int setup_tcp_client(std::string host, std::string path,
+                     int servPort, bool md) {
 	struct addrinfo hints, *res;
 	int sockfd;
     int s;
@@ -64,14 +67,14 @@ int connect_with_server(std::string host, std::string path,
     // TODO: sprawdzic czy warto/trzeba dodac AI_PASSIVE w hints.flags?
 
 	if ((s = getaddrinfo(host.c_str(), std::to_string(servPort).c_str(), &hints, &res)) != 0) {
-		std::cerr << "getaddrinfo error: " << gai_strerror(s) << std::endl;
+		std::cerr << "Getaddrinfo error in TCP client: " << gai_strerror(s) << std::endl;
         return -1;
 	}
 
 	sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
     if (sockfd < 0) {
         freeaddrinfo(res);
-        std::cerr << "socket error" << std::endl;
+        std::cerr << "Socket error during TCP client setup." << std::endl;
         return -1;
     }
 
@@ -79,26 +82,25 @@ int connect_with_server(std::string host, std::string path,
     if (s < 0) {
         freeaddrinfo(res);
         close(sockfd);
-        std::cerr << "connect error" << std::endl;
+        std::cerr << "Connect error during TCP client setup." << std::endl;
         return -1;
     }
     freeaddrinfo(res);
     
-    std::string request = create_request(path, (md == "yes") ? "1" : "0");
-    std::cerr << "request to server:\n" << request << std::endl;
+    std::string request = create_request(path, md);
+    std::cerr << "Request to server:\n" << request << std::endl;
 
     if (send(sockfd, request.c_str(), request.size(), 0) < 0) {
         close(sockfd);
-        std::cerr << "send error" << std::endl;
+        std::cerr << "Send error in TCP client setup." << std::endl;
         return -1;
     }
 
-    char buffer[MAX_BUF_SIZE];
-    memset(buffer, 0, MAX_BUF_SIZE);
+    char buf[MAX_BUF_SIZE];
+    memset(buf, 0, MAX_BUF_SIZE);
 
-    // receive the answer
-    s = recv(sockfd, buffer, MAX_BUF_SIZE, 0);
-    std::cerr << "initial response from server:\n" << buffer << std::endl;
+    s = recv(sockfd, buf, MAX_BUF_SIZE, 0);
+    std::cerr << "initial response from server:\n" << buf << std::endl;
 
     return sockfd;
 }
@@ -114,15 +116,18 @@ bool process_first_tcp_event(int fd, bool is_player_paused) {
 
     int len = recv(fd, buf, MAX_BUF_SIZE, 0);
 
+    std::cerr << "dlugosc 1. pakietu to: " << len << ", a pierwszy bit to " << int(buf[0]) << std::endl;
+
     static int pom = 0;
+    pom++;
     if (!is_player_paused) {
         bool is_titled = parse_the_metadata(buf, len);
         pom += len;
-        //std::cerr << "len: " << len << "       lenmod: " << len % md_int << " is_tilted " << is_titled << std::endl;
+        std::cerr << "len: " << len << "       lenmod: " << len % md_int << " is_tilted " << is_titled << std::endl;
         if (is_output_to_file)
             output_to_file_stream.write(buf, len);
-        else
-            std::cout.write(buf, len);
+        //else
+        //    std::cout.write(buf, len);
 
         return is_titled;
     }

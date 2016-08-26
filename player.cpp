@@ -91,6 +91,7 @@ void finito_amigos() {
 
 Parameters parse_parameters(int argc, char* argv[]) {
     Parameters p;
+    std::string str_md;
 
     po::options_description desc("OPTIONS");
     desc.add_options()
@@ -100,7 +101,7 @@ Parameters parse_parameters(int argc, char* argv[]) {
         ("file", po::value<std::string>(&p.output_file), "path to file, to which audio is saved"
               ", or '-' when audio on stdout")
         ("m-port", po::value<int>(&p.our_udp_port), "UDP port on which we listen")
-        ("md", po::value<std::string>(&p.md), "'yes' if metadata on, 'no' otherwise")
+        ("md", po::value<std::string>(&str_md), "'yes' if metadata on, 'no' otherwise")
     ;
 
     po::positional_options_description pod;
@@ -122,7 +123,11 @@ Parameters parse_parameters(int argc, char* argv[]) {
         throw new std::runtime_error("Unmatched number of player parameters."); 
     }
 
-    if (p.md != "yes" && p.md != "no")
+    if (str_md == "yes")
+        p.md = true;
+    else if (str_md == "no")
+        p.md = false;
+    else
         throw new std::runtime_error("Metadata must be either 'yes' or 'no' (without '').\n");
 
     return p;
@@ -153,7 +158,7 @@ int main(int argc, char* argv[]) {
     else
         is_output_to_file = false;
 
-    int tcp_fd = connect_with_server(p.host, p.path, p.serv_port, p.md);
+    int tcp_fd = setup_tcp_client(p.host, p.path, p.serv_port, p.md);
     int udp_fd = setup_udp_server(p.our_udp_port); 
     run_main_player(tcp_fd, udp_fd);
 
