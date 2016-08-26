@@ -4,10 +4,11 @@
 
 namespace po = boost::program_options;
 
-#include <iostream>
 #include <sys/poll.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+
+#include <iostream>
 
 const int TCP_S = 0;
 const int UDP_S = 1;
@@ -22,6 +23,8 @@ bool is_md_fetched; // says if we already received metadata and set it to
                     // correct value instead of default
 bool is_player_closed;
 bool is_player_paused;
+bool is_output_to_file;
+std::ofstream output_to_file_stream;
 
 int run_main_player(int tcp_fd, int udp_fd) {
     std::cerr << "Main player is being run." << std::endl;
@@ -43,8 +46,6 @@ int run_main_player(int tcp_fd, int udp_fd) {
     while (!is_player_closed) {
         fds[TCP_S].revents = 0;
         fds[UDP_S].revents = 0;
-
-        fds[TCP_S].fd = -1;
 
         if ((poll(fds, 2, -1)) == -1) {
             std::cerr << "error in poll\n";
@@ -83,64 +84,71 @@ void send_title(int udp_fd, struct sockaddr client_address) {
 void finito_amigos() {
     close(backup_tcp_fd);
     close(backup_udp_fd);
+    if (is_output_to_file)
+        output_to_file_stream.close();
     std::cerr << "Player closed." << std::endl;
 }
 
-int main(int argc, char* argv[]) {
-    std::string host;
-    std::string path;
-    int servPort;
-    int ourPort;
-    std::string outputFile;
-    std::string md;
+// dodac jakies sprawdzenia czy md, porty poprawne, itp.
+Parameters parse_parameters(int argc, char* argv[]) {
+    Parameters p;
 
-    try {
-        po::options_description desc("OPTIONS");
-        desc.add_options()
-            ("host", po::value<std::string>(&host), "host server name")
-            ("path", po::value<std::string>(&path), "path to resource, commonly just /")
-            ("r-port", po::value<int>(&servPort), "server's port")
-            ("file", po::value<std::string>(&outputFile), "path to file, to which audio is saved"
-                  ", or '-' when audio on stdout")
-            ("m-port", po::value<int>(&ourPort), "UDP port on which we listen")
-            ("md", po::value<std::string>(&md), "'yes' if metadata on, 'no' otherwise")
-        ;
+    po::options_description desc("OPTIONS");
+    desc.add_options()
+        ("host", po::value<std::string>(&p.host), "host server name")
+        ("path", po::value<std::string>(&p.path), "path to resource, commonly just /")
+        ("r-port", po::value<int>(&p.serv_port), "server's port")
+        ("file", po::value<std::string>(&p.output_file), "path to file, to which audio is saved"
+              ", or '-' when audio on stdout")
+        ("m-port", po::value<int>(&p.our_udp_port), "UDP port on which we listen")
+        ("md", po::value<std::string>(&p.md), "'yes' if metadata on, 'no' otherwise")
+    ;
 
-        po::positional_options_description p;
-        p.add("host", 1);
-        p.add("path", 1);
-        p.add("r-port", 1);
-        p.add("file", 1);
-        p.add("m-port", 1);
-        p.add("md", 1);
-        
-        po::variables_map vm;
-        po::store(po::command_line_parser(argc, argv).
-                  options(desc).positional(p).run(), vm);
-        po::notify(vm);
+    po::positional_options_description pod;
+    pod.add("host", 1);
+    pod.add("path", 1);
+    pod.add("r-port", 1);
+    pod.add("file", 1);
+    pod.add("m-port", 1);
+    pod.add("md", 1);
     
-        if (vm.size() != PLAYER_PARAMETERS_NR) {
-            std::cout << "Usage: player OPTIONS\n";
-            std::cout << desc;
-            return 1;
-        }
-        else {
-            std::cerr << "parameters for player:" << std::endl
-                      << host << std::endl
-                      << path << std::endl
-                      << servPort << std::endl
-                      << outputFile << std::endl
-                      << ourPort << std::endl
-                      << md << std::endl;
+    po::variables_map vm;
+    po::store(po::command_line_parser(argc, argv).
+              options(desc).positional(pod).run(), vm);
+    po::notify(vm);
 
-            // dodac jakies sprawdzenia czy md, porty poprawne, itp.
-            int tcp_fd = connect_with_server(host, path, servPort, md);
-            int udp_fd = setup_udp_server(ourPort); 
-            run_main_player(tcp_fd, udp_fd);
-        }
+    if (vm.size() != PLAYER_PARAMETERS_NR) {
+        std::cout << "Usage: player OPTIONS\n";
+        std::cout << desc;
+        throw new std::runtime_error("Unmatched number of player parameters."); 
     }
-    catch(std::exception& e)
-    {
+
+    return p;
+}
+
+int main(int argc, char* argv[]) {
+    try {
+        Parameters p = parse_parameters(argc, argv);
+        std::cerr << "Parameters for player:" << std::endl
+                  << "host: " << p.host << std::endl
+                  << "path: " << p.path << std::endl
+                  << "serv port: " << p.serv_port << std::endl
+                  << "output file: " << p.output_file << std::endl
+                  << "our UDP port: " << p.our_udp_port << std::endl
+                  << "metadata? " << p.md << std::endl << std::endl;
+
+        if (p.output_file != "-") {
+            is_output_to_file = true;
+            output_to_file_stream.open(p.output_file, std::ofstream::binary);
+        }
+        else
+            is_output_to_file = false;
+
+        int tcp_fd = connect_with_server(p.host, p.path, p.serv_port, p.md);
+        int udp_fd = setup_udp_server(p.our_udp_port); 
+        run_main_player(tcp_fd, udp_fd);
+    }
+    catch (std::exception& e) {
         std::cerr << e.what() << std::endl;
         return 1;
     }    

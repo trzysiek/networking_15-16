@@ -2,10 +2,20 @@
 #define __PLAYER_H__
 
 #include <string>
+#include <fstream>
 
 const unsigned int PLAYER_SOCKETS_NR = 2;
 const unsigned int PLAYER_PARAMETERS_NR = 6;
 const unsigned int MAX_BUF_SIZE = 32768;
+
+struct Parameters {
+    std::string host;
+    std::string path;
+    int serv_port;
+    int our_udp_port;
+    std::string output_file;
+    std::string md;
+};
 
 std::string create_request(std::string path, std::string meta);
 int connect_with_server(std::string host, std::string path,
@@ -27,5 +37,7 @@ extern int md_int;
 extern std::string last_received_title;
 extern bool is_md_fetched;
 extern bool is_player_paused;
+extern bool is_output_to_file;
+extern std::ofstream output_to_file_stream;
 
 #endif

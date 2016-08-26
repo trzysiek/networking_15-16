@@ -3,3 +3,4 @@
 - ogarniecie protokolu TCP (cos nie dziala)
 #- poprawa pauzy/resume (nie mozna wylaczac deskryptora chyba tylko odbierac i olewac)
 #- UDP obsluga zlego msg i test tego
+- plik

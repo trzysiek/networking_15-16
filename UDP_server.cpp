@@ -33,30 +33,17 @@ int setup_udp_server(int port) {
     }
 
     // find first free port number >= "port"
-    do {
-        std::cerr << "port: " << port << std::endl;
-        if ((bind(sockfd, res->ai_addr, res->ai_addrlen)) >= 0)
-            break;
-        else
-            port++;
-    } while (port <= MAX_BUF_SIZE); // TODO poprawic :D
-    std::cerr << "UDP port: " << port << std::endl;
-    struct sockaddr_in client_address;
+    // poprawic :D max_buf_size'a
+    for (int s = -1; s < 0, port <= MAX_BUF_SIZE; port++)
+        s = bind(sockfd, res->ai_addr, res->ai_addrlen);
+    // sprawdzac czy nie wyjechalem poza max_buf_size
+    std::cerr << "Found and bound UDP port: " << port << std::endl;
 
-    char buf[MAX_BUF_SIZE];
-    int flags = 0; // nothing special
-    socklen_t rcva_len = (socklen_t) sizeof(client_address);
-    int len = recvfrom(sockfd, buf, sizeof buf, flags,
-            (struct sockaddr *) &client_address, &rcva_len);
-    if (len < 0) {
-        std::cerr << "a recvfrom error, error code: " << errno << std::endl;
-        return 1;
-    }
     return sockfd;
 }
 
 void process_udp_message(char *buf, int len, int fd, struct sockaddr *client_address) {
-    std::cerr << "dostalem: " << buf << std::endl;
+    std::cerr << "Received by UDP: " << buf << std::endl;
     if (strncmp(buf, "PAUSE", 5) == 0 && len == 5)
         pause_player();
     else if (strncmp(buf, "PLAY", 4) == 0 && len == 4)

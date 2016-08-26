@@ -119,7 +119,11 @@ bool process_first_tcp_event(int fd, bool is_player_paused) {
         bool is_titled = parse_the_metadata(buf, len);
         pom += len;
         //std::cerr << "len: " << len << "       lenmod: " << len % md_int << " is_tilted " << is_titled << std::endl;
-        // std::cout.write(buf, len);
+        if (is_output_to_file)
+            output_to_file_stream.write(buf, len);
+        else
+            std::cout.write(buf, len);
+
         return is_titled;
     }
     return false;
