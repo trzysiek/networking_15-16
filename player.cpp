@@ -49,7 +49,8 @@ int run_main_player(int tcp_fd, int udp_fd) {
             return 1;
         }
         if (fds[TCP_S].revents & POLLIN) {
-            process_tcp_event(tcp_fd, is_player_paused);
+            if (!process_tcp_event(tcp_fd, is_player_paused))
+                finito_amigos();
         }
         if (fds[UDP_S].revents & POLLIN) {
             process_udp_event(udp_fd);
