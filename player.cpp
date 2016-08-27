@@ -30,8 +30,6 @@ std::ofstream output_to_file_stream;
 int run_main_player(int tcp_fd, int udp_fd) {
     std::cerr << "Main player is being run." << std::endl;
 
-    char buf[MAX_BUF_SIZE];
-
     // setting global variables
     backup_udp_fd = udp_fd;
     backup_tcp_fd = tcp_fd;
@@ -42,8 +40,6 @@ int run_main_player(int tcp_fd, int udp_fd) {
     fds[UDP_S].fd = udp_fd;
     fds[UDP_S].events = POLLIN | POLLOUT;
 
-    bool is_first_tcp = true;
-
     while (!is_player_closed) {
         fds[TCP_S].revents = 0;
         fds[UDP_S].revents = 0;
@@ -53,12 +49,14 @@ int run_main_player(int tcp_fd, int udp_fd) {
             return 1;
         }
         if (fds[TCP_S].revents & POLLIN) {
-            if (process_first_tcp_event(tcp_fd, is_player_paused)) {}
+            process_tcp_event(tcp_fd, is_player_paused);
         }
         if (fds[UDP_S].revents & POLLIN) {
             process_udp_event(udp_fd);
         }
     }
+
+    return 0;
 }
 
 void pause_player() {
@@ -76,7 +74,7 @@ void send_title(int udp_fd, struct sockaddr client_address) {
     int flags = 0;
     int sent_len = sendto(udp_fd, last_received_title.c_str(),
             last_received_title.size(), flags, &client_address, snda_len);
-    if (sent_len != last_received_title.size())
+    if (sent_len != (int)last_received_title.size())
         std::cerr << "Error in sending title." << std::endl;
     else
         std::cerr << "Title sent, title: " << last_received_title << std::endl;
@@ -87,6 +85,7 @@ void finito_amigos() {
     close(backup_udp_fd);
     if (is_output_to_file)
         output_to_file_stream.close();
+    is_player_closed = true;
     std::cerr << "Player closed." << std::endl;
 }
 

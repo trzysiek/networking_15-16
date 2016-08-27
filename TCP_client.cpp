@@ -18,13 +18,25 @@ std::string create_request(std::string path, bool md) {
            "\r\n";
 }
 
-bool parse_the_metaint(char *buf, int len) {
-    std::string msg(buf, len);
+// erases not needed header data
+std::string eliminate_initial_response_header(std::string msg) {
+    const std::regex header {"ICY.*(\\n|\\r\\n)icy-notice1:.*(\\n|\\r\\n)icy-notice2:.*(\\n|\\r\\n)"};
+    const std::string replacer = "";
+    return regex_replace(msg, header, replacer);
+}
+
+std::string eliminate_metadata(std::string msg) {
+    const std::regex metadata {"icy-name:.*(?:\\n|\\r\\n)(.*(?:\\n|\\r\\n))*icy-br:\\d*(\\n|\\r\\n)(\\n|\\r\\n)"};
+    const std::string replacer = "";
+    return regex_replace(msg, metadata, replacer);
+}
+
+bool parse_the_metaint(std::string msg) {
     const std::regex reg_ex {"icy-metaint:([1-9]\\d*)"};
     std::smatch matches;
 
     if (regex_search(msg, matches, reg_ex)) {
-        std::string md_int_as_str = std::string(matches[1].first, matches[2].second);
+        std::string md_int_as_str = std::string(matches[1].first, matches[1].second);
         md_int = std::stoi(md_int_as_str);
         std::cerr << "Received md_int is: " << md_int << std::endl;
         return true;
@@ -33,22 +45,66 @@ bool parse_the_metaint(char *buf, int len) {
 }
 
 // true if ok (there was metadata, and its parsed), false otherwise
-bool parse_the_metadata(char *buf, int len) {
-    std::string s (buf, len);
+bool parse_the_title(std::string s) {
     size_t pos = s.find(TITLE_STR);
     if (pos != std::string::npos) {
-        std::cerr << "JEST! jak duzy? " << len << std::endl;
-        std::cerr << buf << std::endl;
         pos += TITLE_STR.size();
         last_received_title = "";
-        while (buf[pos] != ';') {
-            last_received_title += buf[pos];
+        while (s[pos] != ';') {
+            last_received_title += s[pos];
             pos++;
         }
         std::cerr << "TITLE: " << last_received_title << std::endl;
         return true;
     }
     return false;
+}
+
+void parse_tcp_message(std::string msg) {
+    static int byte_count = 0; // counts bytes till next metadata
+    if (!is_md_int_fetched)
+        if (parse_the_metaint(msg))
+            is_md_int_fetched = true;
+
+    // TODO mb in metadata?
+    if (parse_the_title(msg))
+        std::cerr << "TITLED!\n";
+
+    std::string msg2 = eliminate_initial_response_header(msg);
+    std::string msg3 = eliminate_metadata(msg2);
+    std::string final_msg = "";
+    std::string left_msg = "";
+
+    std::cerr << byte_count << " " << msg3.size() << " " << msg.size() << std::endl;
+
+    if (byte_count == md_int) {
+        // we should have received meta-data
+        int md_len = int(msg[0]) * 16 + 1;
+        for (int i = md_len; i < (int)msg3.size(); ++i)
+            final_msg += msg3[i];
+        byte_count -= md_int;
+
+        std::cerr << "\nGG " << int(msg[0]) << " " << msg.size() << " " << final_msg.size() << " " << byte_count << std::endl;
+    }
+    else if (byte_count + (int)msg3.size() < md_int)
+        final_msg = msg3;
+    else {
+        // we cut metadata in the middle
+        int len = md_int - byte_count;
+        for (int i = 0; i < len; ++i)
+            final_msg += msg3[i];
+        left_msg = msg3.substr(len, MAX_BUF_SIZE);
+    }
+
+    byte_count += final_msg.size();
+
+    if (is_output_to_file)
+        output_to_file_stream << final_msg;
+    else
+        write(STDOUT_FILENO, final_msg.c_str(), final_msg.size());
+
+    if (left_msg.size() > 0)
+        parse_tcp_message(left_msg);
 }
 
 int setup_tcp_client(std::string host, std::string path,
@@ -96,56 +152,17 @@ int setup_tcp_client(std::string host, std::string path,
     memset(buf, 0, MAX_BUF_SIZE);
 
     s = recv(sockfd, buf, MAX_BUF_SIZE, 0);
-    std::cerr << "initial response from server:\n" << buf << std::endl;
+    parse_tcp_message(std::string(buf, s));
+    // sprawdzac -1 czy cos?
 
     return sockfd;
 }
 
-bool process_first_tcp_event(int fd, bool is_player_paused) {
+void process_tcp_event(int fd, bool is_player_paused) {
     char buf[MAX_BUF_SIZE];
     memset(buf, 0, MAX_BUF_SIZE);
 
-    const int MAX_INTERVAL = 65336;
-    bool sizes[MAX_INTERVAL];
-    int sizes_size = std::min(MAX_INTERVAL, md_int);
-    std::fill(sizes, sizes + sizes_size, true);
-
     int len = recv(fd, buf, MAX_BUF_SIZE, 0);
 
-    std::cerr << "dlugosc 1. pakietu to: " << len << ", a pierwszy bit to " << int(buf[0]) << std::endl;
-
-    if (!is_md_int_fetched)
-        if (parse_the_metaint(buf, len))
-            is_md_int_fetched = true;
-    if (is_md_in_data) {
-        
-    }
-
-    //static int pom = 0;
-    //pom++;
-    //pom += len;
-    //std::cerr << "len: " << len << "       lenmod: " << len % md_int << std::endl;
-    if (is_output_to_file)
-        output_to_file_stream.write(buf, len);
-    else
-        std::cout.write(buf, len);
-}
-
-void process_normal_tcp_event(int fd) {
-    int BUFFER_SIZE = 20000;
-    char buf[BUFFER_SIZE];
-    memset(buf, 0, BUFFER_SIZE);
-
-    int len = recv(fd, buf, BUFFER_SIZE, 0);
-
-    static int till_metadata = md_int;
-    std::cerr << till_metadata << std::endl;
-    if (till_metadata == 0) {
-        parse_the_metadata(buf, len);
-        till_metadata = md_int;
-    }
-    else if (till_metadata > 0) {
-        std::cout.write(buf, len);
-        till_metadata -= len;
-    }
+    parse_tcp_message(std::string(buf, len));
 }

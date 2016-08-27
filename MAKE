@@ -1,5 +1,5 @@
 rm *.o *.h.gch
-g++ -std=c++11 -c player.cpp
-g++ -std=c++11 -c TCP_client.cpp
-g++ -std=c++11 -c UDP_server.cpp
-g++ -std=c++11 player.o TCP_client.o UDP_server.o -o player -lboost_program_options
+g++ -Wall -std=c++11 -c player.cpp
+g++ -Wall -std=c++11 -c TCP_client.cpp
+g++ -Wall -std=c++11 -c UDP_server.cpp
+g++ -Wall -std=c++11 player.o TCP_client.o UDP_server.o -o player -lboost_program_options

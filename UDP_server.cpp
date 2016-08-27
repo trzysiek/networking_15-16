@@ -48,7 +48,7 @@ int setup_udp_server(int port) {
 }
 
 // Parses and processes further a received UDP message
-void process_udp_message(char *buf, int len, int fd, struct sockaddr *client_address) {
+void parse_udp_message(char *buf, int len, int fd, struct sockaddr *client_address) {
     std::cerr << "Received by UDP: " << buf << std::endl;
     if (strncmp(buf, "PAUSE", 5) == 0 && len == 5)
         pause_player();
@@ -59,7 +59,7 @@ void process_udp_message(char *buf, int len, int fd, struct sockaddr *client_add
     else if (strncmp(buf, "QUIT", 4) == 0 && len == 4)
         finito_amigos();
     else
-        std::cerr << "Invalid message type\n";
+        std::cerr << "Invalid message type" << std::endl;
 }
 
 void process_udp_event(int fd) {
@@ -74,5 +74,5 @@ void process_udp_event(int fd) {
     if (len < 0)
         std::cerr << "Recvfrom error, error code: " << errno << std::endl;
     else
-        process_udp_message(buf, len, fd, (struct sockaddr *) &client_address);
+        parse_udp_message(buf, len, fd, (struct sockaddr *) &client_address);
 }
