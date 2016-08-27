@@ -26,6 +26,7 @@ const int AWAITING = 1;
 const int RUNNING = 2;
 const int START_MESSAGE = 0;
 const int QUIT_MESSAGE = 1;
+const int TITLE_TIMEOUT = 2;
 //Struktura na przechowywanie poleceń w kolejce
 struct queue_data {
 	int data_type;
@@ -46,16 +47,28 @@ struct action_comparator {
 struct pollfd connections[MAX_CONNECTIONS];
 stack<int> available_id;
 set<int> player_id;
-map<int, vector<string>> player_replies;
+//map<int, vector<string>> player_replies;
 set<pair<time_t, queue_data>, action_comparator> queued_actions; 
 int players_state[MAX_CONNECTIONS];
-bool awaiting_title[MAX_CONNECTIONS];
 double poll_time = -1;
-
+//Zbiór kolejek z połączeniami oczekującymi na odpowiedź na TITLE
+map<int, queue<int>> TITLE_queue;
+//Tablica pamiętająca która sesja telnetowa wywołała danego playera
+int fathers[MAX_CONNECTIONS];
+//Aktualizacja czasu oczekiwania w głównej funkcji poll
 void actualize_poll_time() {
 	auto it = queued_actions.begin();
-	time_t now = time(0);
-	poll_time = difftime(it->first, now)*1000;
+	//Jeśli kolejka zdarzeń jest pusta, to poll czeka nieskończoność
+	if (it == queued_actions.end()) {
+		poll_time = -1;
+	} else {
+		time_t now = time(0);
+		poll_time = difftime(it->first, now)*1000;
+	}
+}
+
+void pass_error_to_telnet(int telnet_index, string error) {
+	send(connections[telnet_index].fd, error.c_str(), error.length(), 0);
 }
 
 int get_new_id() {
@@ -73,14 +86,13 @@ void release_id(int id) {
 
 void start_command(string command, string hostname, string port, int index, int id) {
 	string message;
-	//TODO: OGARNĄĆ STREAMA Z POPEN ŻEBY ZOBACZYĆ CZY PLAYER SIE NIE WYPIERDALA
 	popen(command.c_str(), "r");
 	//Zarezerwuj id dla nowego playera
 	players_state[id] = RUNNING;
 	//Stwórz UDP socketa dla nowego playera
 	struct addrinfo addr_hints;
   	struct addrinfo *addr_result;
-  	memset(&addr_hints, 0, sizeof addr_hints);
+	memset(&addr_hints, 0, sizeof addr_hints);
 	addr_hints.ai_family = AF_UNSPEC;
 	addr_hints.ai_socktype = SOCK_DGRAM;
 	addr_hints.ai_flags = AI_PASSIVE;
@@ -91,31 +103,53 @@ void start_command(string command, string hostname, string port, int index, int 
 	}
 	connect(sockfd, addr_result->ai_addr, addr_result->ai_protocol);
 	connections[id].fd = sockfd;
-	//Powiadom sesję telnetową o sukcesie TODO:BYĆ MOŻE TO POWINNO BYĆ WYSYŁANE PRZY UDANYM POLLOUCIE? ALBO PRZY JAKIMŚ TAM RETURNIE Z POPEN()
+	//Powiadom sesję telnetową o sukcesie
 	message = "OK " + to_string(id);
 	send(connections[index].fd, message.c_str(), message.length(), 0);
+	//Zwolnienie pamięci
+	freeaddrinfo(addr_result);
+	//Pamiętamy kto wywołał tego playera
+	fathers[id] = index;
 }
 
 void message_for_player(int id, int telnet_index, string command) {
+	string reply = "OK " + to_string(id);
 	if (player_id.find(id) == player_id.end()) {
-		cerr << "Player of given id does not exist" << endl; //Może niech wypisuje to id, albo nawet wysyła to do sesji telnetowej?
+		string error = "ERROR " + to_string(id) + " player does not exist";
+		cerr << "error" << endl;
+		pass_error_to_telnet(telnet_index, error);
 	} else if ((command == "PAUSE" || command == "PLAY") && players_state[id] == RUNNING) {
-		send(connections[id].fd, command.c_str(), command.length(), 0);
+		if (send(connections[id].fd, command.c_str(), command.length(), 0) != -1){
+			send(connections[telnet_index].fd, reply.c_str(), reply.length(), 0);
+		}
 	} else if (command == "TITLE" && players_state[id] == RUNNING) {
-		awaiting_title[id] = true;
-		send(connections[id].fd, command.c_str(), command.length(), 0);
-		//TODO:Zrealizować oczekiwanie na title? Maks 3 sekundy.
+		if (send(connections[id].fd, command.c_str(), command.length(), 0) != -1) {
+			if (TITLE_queue.count(id) > 0) {
+				TITLE_queue[id].push(telnet_index);
+			} else {
+				queue<int> v;
+				v.push(telnet_index);
+				TITLE_queue[id] = v;
+			}
+			time_t now = time(0);
+			time_t title_deadline = now + 3;
+			queue_data title_data = {TITLE_TIMEOUT, id, "", "", "", 0};
+			pair<time_t, queue_data> data {title_deadline, title_data};
+			queued_actions.insert(data);
+			actualize_poll_time();
+		}
 	} else if (command == "QUIT") {
 		if (players_state[id] == RUNNING) {
-			send(connections[id].fd, command.c_str(), command.length(), 0);
+			if (send(connections[id].fd, command.c_str(), command.length(), 0) != -1) {
+				send(connections[telnet_index].fd, reply.c_str(), reply.length(), 0);
+			}
+			close(connections[id].fd);
+			connections[id].fd = -1;
 		} else if (players_state[id] == AWAITING) {
 			players_state[id] = NON_EXISTENT;
+			send(connections[telnet_index].fd, reply.c_str(), reply.length(), 0);
 		}
 	}
-}
-
-void at_command() {
-	
 }
 
 void process_telnet_input(char buff[], int index) {
@@ -131,7 +165,7 @@ void process_telnet_input(char buff[], int index) {
 	int id;
 	string message;
 
-	//Usuń kontrolne bajty przysłane przez sesję telnetową TODO:Spróbować to przetestować jakoś
+	//Usuń kontrolne bajty przysłane przez sesję telnetową
 	boost::regex_replace(input, control_bytes, empty);
 	boost::regex_replace(input, double_escape, single_escape);
 
@@ -143,14 +177,10 @@ void process_telnet_input(char buff[], int index) {
 		//Wykonaj działania związane z poleceniem start
 		id = get_new_id();
 		start_command(cmd, hostname, port, index, id);
-		//TODO:Wpisać player_replies i dać POLLOUT na sesje telnetowa o indeksie index????
-		
 	} else if (boost::regex_search(input, match, player_command)) {
 		id = atoi(string(match[2].first, match[2].second).c_str());
 		message = string(match[1].first, match[1].second);
 		message_for_player(id, index, message);
-		//TODO:1.Wpisać player_replies i dać POLLOUT JEŚLI TO NIE TITLE 2.Jeśli title to jak otrzymamy tytuł damy POLLOUT itd.
-
 	} else if (boost::regex_search(input, match, at)) {
 		//Wczytaj dane przesłane poleceniem AT
 		string hostname = string(match[3].first, match[3].second);
@@ -165,18 +195,21 @@ void process_telnet_input(char buff[], int index) {
 		strptime(start_time.c_str(), "%H.%M", ltm);
 		time_t formatted_start_time = mktime(ltm);
 		time_t end_time = formatted_start_time + 60*atoi(player_life.c_str());
+		//Nowe id dla nowego playera
 		id = get_new_id();
-
+		players_state[id] = AWAITING;
 		//Zakolejkuj polecenie startu playera
 		queue_data start_data = {START_MESSAGE, id, cmd, hostname, port, index};
 		pair<time_t, queue_data> data {formatted_start_time, start_data};
 		queued_actions.insert(data);
 		//Zakolejkuj polecenie wyłączenia playera
-		queue_data quit_data = {QUIT_MESSAGE, id, "", "", "", 0};
+		queue_data quit_data = {QUIT_MESSAGE, id, "", "", "", index};
 		data = {end_time, quit_data};
 		queued_actions.insert(data);
 		//Zaktualizuj czas oczekiwania na wyjście z polla
 		actualize_poll_time();
+		//Pamiętamy kto wywołał danego playera
+		fathers[id] = index;
 	} else {
 		cerr << "Wrong command received from telnet session" << endl;
 	}
@@ -191,17 +224,6 @@ in_port_t get_in_port(struct sockaddr *sa)
 
     return (((struct sockaddr_in6*)sa)->sin6_port);
 }
-
-/*
-
-TODO: 	1. FREEADDRINFO, CLOSE SOCKETY
-	3. WYPISYWAC ERRORA JAK SSH PRÓBUJE PYTAĆ O HASŁO
-	4. ERRORY W FUNKCJACH INNYCH NIZ MAIN TEZ POWINNY WYWALAC PROGRAM
-	5. ERRORY WYPISYWAĆ TELNETOWI
-	7. IGNOROWANIE KOMUNIKATÓW DLA AT PLAYERÓW
-	8. MOŻE SPRAWDZAĆ CZY PODANE PORTY SĄ WOLNE W SUMIE?? I W PLAYERZE I MASTERZE.
-
-*/
 
 int main(int argc, char *argv[]) {
 	char *port;
@@ -222,7 +244,7 @@ int main(int argc, char *argv[]) {
 		memset(buffer[i], 0, BUFF_SIZE);
 	}
 	memset(players_state, 0, MAX_CONNECTIONS);
-	memset(awaiting_title, false, MAX_CONNECTIONS);
+	memset(fathers, 0 , MAX_CONNECTIONS);
 
 	//Weryfikacja parametrów programu
 	if (argc == 2) {
@@ -274,6 +296,8 @@ int main(int argc, char *argv[]) {
     		cerr << "Listen error" << endl;
 		return 0;
   	}
+	//Zwolnienie pamięci
+	freeaddrinfo(addr_result);
 
 	do {
 		for (i = 0; i < MAX_CONNECTIONS; ++i)
@@ -302,7 +326,6 @@ int main(int argc, char *argv[]) {
 					}
 				}
 			}
-
 			//Szukamy indeksu innego niż 0 na którym zaszło jakieś zdarzenie
 			for (i = 1; i < MAX_CONNECTIONS; i++) {
 				//Znaleziono dane do odczytu
@@ -315,22 +338,23 @@ int main(int argc, char *argv[]) {
 
 					//Sprawdzamy czy znaleziony indeks to id działającego playera czy numer połączenia telnetowego
 					if (player_id.find(i) != player_id.end()) {
-						
+						if (TITLE_queue.count(i) > 0) {
+							int receiver = TITLE_queue[i].front();
+							TITLE_queue[i].pop();
+							send(connections[receiver].fd, buffer[i], rval, 0);
+						} else {
+							cerr << "Player sent redundant data" << endl;
+						}
 					} else {
 						process_telnet_input(buffer[i], i);
-						memset(buffer[i], 0, BUFF_SIZE);
 					}
-				}
-				//Znaleziono połączeniu gotowe do zapisu
-				if (connections[i].fd != -1 && (connections[i].revents & POLLOUT)) {
-
+					memset(buffer[i], 0, BUFF_SIZE);
 				}
 			}
-
+			actualize_poll_time();
 		} else if (ret == 0) {
-			cout << "WLAZLEM TU GDZIE RET = 0 ZIOM" << endl;
 			auto it = queued_actions.begin();
-			if (it->second.data_type == START_MESSAGE) {
+			if (it->second.data_type == START_MESSAGE && players_state[it->second.id] == AWAITING) {
 				start_command(it->second.parameters, it->second.hostname, it->second.port, it->second.index, it->second.id);
 			} else if (it->second.data_type == QUIT_MESSAGE) {
 				if (players_state[it->second.id] != NON_EXISTENT) {
@@ -338,11 +362,16 @@ int main(int argc, char *argv[]) {
 					release_id(it->second.id);
 					string q = "QUIT";
 					send(connections[it->second.id].fd, q.c_str(), q.length(), 0);
+					close(connections[it->second.id].fd);
+					connections[it->second.id].fd = -1;
 				}
+			} else if (it->second.data_type == TITLE_TIMEOUT){
+				TITLE_queue[it->second.id].pop();
+				string error = "ERROR: " + to_string(it->second.id) + " waiting time for title exceeded";
+				pass_error_to_telnet(it->second.index, error);
 			}
 			queued_actions.erase(it);
+			actualize_poll_time();
 		}
-
 	} while(true);
 }
-
