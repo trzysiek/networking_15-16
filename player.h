@@ -9,7 +9,7 @@ const unsigned int PLAYER_PARAMETERS_NR = 6;
 const unsigned int MAX_BUF_SIZE = 32768;
 const int MAX_PORT = 65335;
 
-const std::string TITLE_STR = "StreamTitle=";
+const std::string TITLE_STR = "StreamTitle='";
 
 struct Parameters {
     std::string host;

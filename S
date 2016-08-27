@@ -1,2 +1,2 @@
-./player stream3.polskieradio.pl / 8900 - 123 yes | mplayer -cache 1024 -
+./player stream3.polskieradio.pl / 8900 - 123 no | mplayer -cache 1024 -
 

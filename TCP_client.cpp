@@ -54,6 +54,7 @@ bool parse_the_title(std::string s) {
             last_received_title += s[pos];
             pos++;
         }
+        last_received_title.pop_back();
         std::cerr << "TITLE: " << last_received_title << std::endl;
         return true;
     }
@@ -66,37 +67,44 @@ void parse_tcp_message(std::string msg) {
         if (parse_the_metaint(msg))
             is_md_int_fetched = true;
 
-    // TODO mb in metadata?
-    if (parse_the_title(msg))
-        std::cerr << "TITLED!\n";
+    parse_the_title(msg);
 
     std::string msg2 = eliminate_initial_response_header(msg);
-    std::string msg3 = eliminate_metadata(msg2);
+    std::string msg3;
+    
+    if (is_md_in_data)
+        msg3 = eliminate_metadata(msg2);
+    else
+        msg3 = msg2;
+
     std::string final_msg = "";
     std::string left_msg = "";
 
-    std::cerr << byte_count << " " << msg3.size() << " " << msg.size() << std::endl;
+    //std::cerr << "Byte count: " << byte_count << ", size after cutting: " << msg3.size() << ", size before cutting: " << msg.size() << std::endl;
 
-    if (byte_count == md_int) {
-        // we should have received meta-data
-        int md_len = int(msg[0]) * 16 + 1;
-        for (int i = md_len; i < (int)msg3.size(); ++i)
-            final_msg += msg3[i];
-        byte_count -= md_int;
+    if (is_md_in_data) {
+        if (byte_count == md_int) {
+            // we should have received meta-data
+            int md_len = int(msg[0]) * 16 + 1;
+            for (int i = md_len; i < (int)msg3.size(); ++i)
+                final_msg += msg3[i];
+            byte_count -= md_int;
 
-        std::cerr << "\nGG " << int(msg[0]) << " " << msg.size() << " " << final_msg.size() << " " << byte_count << std::endl;
+            std::cerr << "\nGG " << int(msg[0]) << " " << msg.size() << " " << final_msg.size() << " " << byte_count << std::endl;
+        }
+        else if (byte_count + (int)msg3.size() < md_int)
+            final_msg = msg3;
+        else {
+            // we cut metadata in the middle
+            int len = md_int - byte_count;
+            final_msg = std::string(msg3.begin(), msg3.begin() + len);
+            left_msg = std::string(msg3.begin() + len, msg3.end());
+        }
+
+        byte_count += final_msg.size();
     }
-    else if (byte_count + (int)msg3.size() < md_int)
+    else
         final_msg = msg3;
-    else {
-        // we cut metadata in the middle
-        int len = md_int - byte_count;
-        for (int i = 0; i < len; ++i)
-            final_msg += msg3[i];
-        left_msg = msg3.substr(len, MAX_BUF_SIZE);
-    }
-
-    byte_count += final_msg.size();
 
     if (is_output_to_file)
         output_to_file_stream << final_msg;
