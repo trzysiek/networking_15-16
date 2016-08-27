@@ -73,10 +73,11 @@ void parse_tcp_message(std::string msg) {
     std::string msg2 = eliminate_initial_response_header(msg);
     std::string msg3 = eliminate_metadata(msg2);
     std::string final_msg = "";
+    std::string left_msg = "";
 
     std::cerr << byte_count << " " << msg3.size() << " " << msg.size() << std::endl;
 
-    if (byte_count >= md_int) {
+    if (byte_count == md_int) {
         // we should have received meta-data
         int md_len = int(msg[0]) * 16 + 1;
         for (int i = md_len; i < (int)msg3.size(); ++i)
@@ -86,17 +87,14 @@ void parse_tcp_message(std::string msg) {
         std::cerr << "\nGG " << int(msg[0]) << " " << msg.size() << " " << final_msg.size() << " " << byte_count << std::endl;
 
     }
-    else if (byte_count + (int)msg3.size() <= md_int)
+    else if (byte_count + (int)msg3.size() < md_int)
         final_msg = msg3;
     else {
         // we cut metadata in the middle
-        int it = 0;
-        while (byte_count < md_int) {
-            final_msg += msg3[it];
-            byte_count++;
-            it++;
-        }
-        parse_tcp_message(msg3.substr(it, MAX_BUF_SIZE));
+        int len = md_int - byte_count;
+        for (int i = 0; i < len; ++i)
+            final_msg += msg3[i];
+        left_msg = msg3.substr(len, MAX_BUF_SIZE);
     }
 
     byte_count += final_msg.size();
@@ -105,6 +103,9 @@ void parse_tcp_message(std::string msg) {
         output_to_file_stream << final_msg;
     else
         write(STDOUT_FILENO, final_msg.c_str(), final_msg.size());
+
+    if (left_msg.size() > 0)
+        parse_tcp_message(left_msg);
 }
 
 int setup_tcp_client(std::string host, std::string path,
