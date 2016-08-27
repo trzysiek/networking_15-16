@@ -4,7 +4,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
-#include <regex>
+#include <boost/regex.hpp>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -20,20 +20,20 @@ std::string create_request(std::string path, bool md) {
 
 // erases not needed header data
 std::string eliminate_initial_response_header(std::string msg) {
-    const std::regex header {"ICY.*(\\n|\\r\\n)icy-notice1:.*(\\n|\\r\\n)icy-notice2:.*(\\n|\\r\\n)"};
+    const boost::regex header {"ICY.*(\\n|\\r\\n)icy-notice1:.*(\\n|\\r\\n)icy-notice2:.*(\\n|\\r\\n)"};
     const std::string replacer = "";
     return regex_replace(msg, header, replacer);
 }
 
 std::string eliminate_metadata(std::string msg) {
-    const std::regex metadata {"icy-name:.*(?:\\n|\\r\\n)(.*(?:\\n|\\r\\n))*icy-br:\\d*(\\n|\\r\\n)(\\n|\\r\\n)"};
+    const boost::regex metadata {"icy-name:.*(?:\\n|\\r\\n)(.*(?:\\n|\\r\\n))*icy-br:\\d*(\\n|\\r\\n)(\\n|\\r\\n)"};
     const std::string replacer = "";
     return regex_replace(msg, metadata, replacer);
 }
 
 bool parse_the_metaint(std::string msg) {
-    const std::regex reg_ex {"icy-metaint:([1-9]\\d*)"};
-    std::smatch matches;
+    const boost::regex reg_ex {"icy-metaint:([1-9]\\d*)"};
+    boost::smatch matches;
 
     if (regex_search(msg, matches, reg_ex)) {
         std::string md_int_as_str = std::string(matches[1].first, matches[1].second);
