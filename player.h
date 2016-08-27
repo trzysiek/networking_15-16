@@ -25,7 +25,7 @@ int setup_tcp_client(std::string host, std::string path,
                      int servPort, bool md);
 int setup_udp_server(int port);
 void process_udp_event(int udp_fd);
-bool process_tcp_event(int tcp_fd, bool is_player_paused);
+void process_tcp_event(int tcp_fd, bool is_player_paused);
 
 void pause_player();
 void resume_player();

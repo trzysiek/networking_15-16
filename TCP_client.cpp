@@ -36,7 +36,7 @@ bool parse_the_metaint(std::string msg) {
     std::smatch matches;
 
     if (regex_search(msg, matches, reg_ex)) {
-        std::string md_int_as_str = std::string(matches[1].first, matches[2].second);
+        std::string md_int_as_str = std::string(matches[1].first, matches[1].second);
         md_int = std::stoi(md_int_as_str);
         std::cerr << "Received md_int is: " << md_int << std::endl;
         return true;
@@ -66,7 +66,7 @@ void parse_tcp_message(std::string msg) {
         if (parse_the_metaint(msg))
             is_md_int_fetched = true;
 
-    // TODO w metadacie mb?
+    // TODO mb in metadata?
     if (parse_the_title(msg))
         std::cerr << "TITLED!\n";
 
@@ -85,7 +85,6 @@ void parse_tcp_message(std::string msg) {
         byte_count -= md_int;
 
         std::cerr << "\nGG " << int(msg[0]) << " " << msg.size() << " " << final_msg.size() << " " << byte_count << std::endl;
-
     }
     else if (byte_count + (int)msg3.size() < md_int)
         final_msg = msg3;
@@ -159,12 +158,11 @@ int setup_tcp_client(std::string host, std::string path,
     return sockfd;
 }
 
-bool process_tcp_event(int fd, bool is_player_paused) {
+void process_tcp_event(int fd, bool is_player_paused) {
     char buf[MAX_BUF_SIZE];
     memset(buf, 0, MAX_BUF_SIZE);
 
     int len = recv(fd, buf, MAX_BUF_SIZE, 0);
 
     parse_tcp_message(std::string(buf, len));
-    return true;
 }
