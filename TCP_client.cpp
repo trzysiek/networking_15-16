@@ -32,6 +32,13 @@ bool parse_the_metaint(char *buf, int len) {
     return false;
 }
 
+std::string parse_potential_header(char *buf, int len) {
+    std::string s(buf, len);
+    std::regex header {"(icy-name:) ((.)*)"}; // TODO tak by dzialal
+    std::string replacer {};
+    return regex_replace(s, header, replacer);
+}
+
 // true if ok (there was metadata, and its parsed), false otherwise
 bool parse_the_metadata(char *buf, int len) {
     std::string s (buf, len);
@@ -101,51 +108,33 @@ int setup_tcp_client(std::string host, std::string path,
     return sockfd;
 }
 
-bool process_first_tcp_event(int fd, bool is_player_paused) {
+
+// TODO finish it
+void process_tcp_event(int fd, bool is_player_paused) {
     char buf[MAX_BUF_SIZE];
     memset(buf, 0, MAX_BUF_SIZE);
 
-    const int MAX_INTERVAL = 65336;
-    bool sizes[MAX_INTERVAL];
-    int sizes_size = std::min(MAX_INTERVAL, md_int);
-    std::fill(sizes, sizes + sizes_size, true);
-
     int len = recv(fd, buf, MAX_BUF_SIZE, 0);
 
-    std::cerr << "dlugosc 1. pakietu to: " << len << ", a pierwszy bit to " << int(buf[0]) << std::endl;
+
+    static int pom = 0;
+    pom++;
+    if (pom > 10)
+        return;
+
+    std::cerr << "dlugosc 1. pakietu to: " << len << ", a pierwszy bit to " << buf << std::endl;
 
     if (!is_md_int_fetched)
         if (parse_the_metaint(buf, len))
             is_md_int_fetched = true;
-    if (is_md_in_data) {
-        
-    }
 
-    //static int pom = 0;
-    //pom++;
-    //pom += len;
-    //std::cerr << "len: " << len << "       lenmod: " << len % md_int << std::endl;
+    std::string to_be_written = parse_potential_header(buf, len);
+    if ((int)to_be_written.size() < len) {
+        std::cerr << "JEST!!!!!!!!!kURWA\n";
+        //std::cout.write(buf, len);
+    }
     if (is_output_to_file)
-        output_to_file_stream.write(buf, len);
-    else
-        std::cout.write(buf, len);
-}
-
-void process_normal_tcp_event(int fd) {
-    int BUFFER_SIZE = 20000;
-    char buf[BUFFER_SIZE];
-    memset(buf, 0, BUFFER_SIZE);
-
-    int len = recv(fd, buf, BUFFER_SIZE, 0);
-
-    static int till_metadata = md_int;
-    std::cerr << till_metadata << std::endl;
-    if (till_metadata == 0) {
-        parse_the_metadata(buf, len);
-        till_metadata = md_int;
-    }
-    else if (till_metadata > 0) {
-        std::cout.write(buf, len);
-        till_metadata -= len;
-    }
+        output_to_file_stream << to_be_written;
+    //else
+        //std::cout.write(to_be_written);
 }
